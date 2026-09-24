@@ -110,14 +110,18 @@ class RpaService extends EventEmitter {
       if (!account) { results.push({ ...target, success: false, error: '账号不存在' }); this.skipPublishConfirmation(target.accountId); return; }
       try {
         const chrome = detectChrome(this.app); if (!chrome.available) throw new RpaError('CHROME_NOT_FOUND', '未检测到 Google Chrome');
-        const flow = getPlatformFlow(account.platform); const profileDir = this.profiles.resolve(account);
-        const session = this.sessions.get(account.id) || new BrowserSession({ account, executable: chrome.executable, profileDir, windowSize: { width: this.state.settings?.browserWidth, height: this.state.settings?.browserHeight }, windowTitle: account.name });
-        this.sessions.set(account.id, session);
         const log = (message) => this.log('queue', account, message);
+        const flow = getPlatformFlow(account.platform); const profileDir = this.profiles.resolve(account);
+        const session = this.sessions.get(account.id) || new BrowserSession({ account, executable: chrome.executable, profileDir, windowSize: { width: this.state.settings?.browserWidth, height: this.state.settings?.browserHeight }, windowTitle: account.name, onProgress: log });
+        this.sessions.set(account.id, session);
         log(`使用账号缓存目录：${profileDir}`);
         const publishUrl = getPublishUrl(account.platform, job.type) || flow.publishUrl || flow.loginUrl;
         log(`启动发布浏览器并直接打开发布页面：${publishUrl}`);
-        await session.start(publishUrl);
+        log('开始建立 Chrome/CDP 会话');
+        await Promise.race([
+          session.start(publishUrl),
+          new Promise((_, reject) => setTimeout(() => reject(new RpaError('BROWSER_START_TIMEOUT', 'Chrome 页面启动超过 45 秒，已终止本次发布')), 45000)),
+        ]);
         log(`Chrome 已连接，调试端口：${session.port}`);
         let login = await this.checkLogin(account);
         if (!login.loggedIn && !login.loginPageMatch) {
