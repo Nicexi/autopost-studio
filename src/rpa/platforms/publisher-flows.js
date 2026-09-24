@@ -32,7 +32,7 @@ const selectors = {
     微信公众号: ['input[placeholder*="标题"]', 'input[placeholder*="请输入标题"]'],
     微信视频号: ['input[placeholder*="标题"]', 'input[placeholder*="作品标题"]', 'input[type="text"]'],
     西瓜视频: ['input[placeholder*="标题"]', 'input[type="text"]'],
-    哔哩哔哩: ['input[placeholder*="标题"]', 'input[placeholder*="视频标题"]', 'input[type="text"]'],
+    哔哩哔哩: ['input[placeholder*="标题"]', 'input[placeholder*="稿件标题"]', 'input[placeholder*="视频标题"]', 'input[type="text"]'],
     知乎: ['input[placeholder*="标题"]', 'textarea[placeholder*="标题"]'],
     掘金: ['input[placeholder="输入文章标题..."]'],
   },
@@ -46,7 +46,7 @@ const selectors = {
     掘金: ['div.CodeMirror-code[role="presentation"]', 'div[contenteditable="true"]'],
     西瓜视频: ['div[contenteditable="true"]', 'textarea'],
     微信视频号: ['div[contenteditable="true"]', 'textarea[placeholder*="描述"]'],
-    哔哩哔哩: ['div[contenteditable="true"]', 'textarea[placeholder*="简介"]'],
+    哔哩哔哩: ['div[contenteditable="true"]', 'textarea[placeholder*="简介"]', 'textarea[placeholder*="作品简介"]', 'textarea'],
   },
   file: {
   X: ['input[type="file"]'],
@@ -55,7 +55,7 @@ const selectors = {
     快手: ['input[type="file"]'],
     西瓜视频: ['input[type="file"]'],
     微信视频号: ['input[type="file"]', 'input[accept*="video"]'],
-    哔哩哔哩: ['input[type="file"]', 'input[accept*="video"]'],
+    哔哩哔哩: ['input[type="file"][accept*="video"]', 'input[type="file"]', 'input[accept*="video"]'],
     知乎: ['input[type="file"]'],
   },
   image: {
@@ -148,8 +148,8 @@ async function uploadVideo(page, platform, job, log = () => {}) {
   const uploaded = await setFile(page, selectors.file[platform], videoPath);
   if (!uploaded) throw new RpaError('VIDEO_INPUT_NOT_FOUND', `${platform} 未找到视频上传控件`);
   log(`视频素材已注入：${videoPath}`);
-  await sleep(2500);
-  log('等待视频处理完成');
+  await sleep(platform === '哔哩哔哩' ? 5000 : 2500);
+  log(platform === '哔哩哔哩' ? '等待哔哩哔哩视频转码和投稿表单加载' : '等待视频处理完成');
 }
 
 async function uploadCover(page, platform, job, log = () => {}) {
@@ -181,7 +181,7 @@ async function schedule(page, publishAt, log = () => {}) {
 }
 
 async function waitForManualPublish(page, platform, log = () => {}, timeoutMs = 30 * 60 * 1000) {
-  const clicked = await clickByText(page, ['发布', '立即发布', '提交发布'], { timeout: 10000 });
+  const clicked = await clickByText(page, ['发布', '立即发布', '提交发布', '立即投稿', '投稿'], { timeout: 10000 });
   if (!clicked) throw new RpaError('PUBLISH_BUTTON_NOT_FOUND', `${platform} 未找到发布按钮`);
   log('已确认，RPA 已点击平台发布按钮');
   log('RPA 已暂停，等待平台反馈结果');
