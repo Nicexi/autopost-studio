@@ -73,7 +73,7 @@ class BrowserSession {
   async configure(url) {
     this.context = this.browser.contexts()[0];
     this.page = this.context.pages()[0] || await this.context.newPage();
-    await this.context.addInitScript(({ platform, locale, mobile, __fpDeviceMemory, __fpHardwareConcurrency, seed }) => {
+    await this.context.addInitScript(({ platform, locale, mobile, __fpDeviceMemory, __fpHardwareConcurrency, colorDepth, pixelDepth, webglVendor, webglRenderer, seed }) => {
       Object.defineProperty(Navigator.prototype, 'platform', { configurable: true, get: () => platform });
       Object.defineProperty(Navigator.prototype, 'language', { configurable: true, get: () => locale });
       Object.defineProperty(Navigator.prototype, 'languages', { configurable: true, get: () => [locale, 'zh', 'en-US'] });
@@ -81,6 +81,10 @@ class BrowserSession {
       Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { configurable: true, get: () => __fpHardwareConcurrency });
       Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { configurable: true, get: () => mobile ? 5 : 0 });
       Object.defineProperty(Navigator.prototype, 'webdriver', { configurable: true, get: () => undefined });
+      Object.defineProperty(Navigator.prototype, 'pdfViewerEnabled', { configurable: true, get: () => true });
+      for (const [key, value] of Object.entries({ platform, language: locale, colorDepth, pixelDepth })) {
+        try { Object.defineProperty(Screen.prototype, key, { configurable: true, get: () => value }); } catch {}
+      }
       const hash = String(seed || 'autopost').split('').reduce((value, char) => ((value * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
       const noise = hash % 7;
       const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
@@ -100,7 +104,18 @@ class BrowserSession {
         if (backup && context) { try { context.putImageData(backup, 0, 0); } catch {} }
         return result;
       };
-    }, { platform: this.fingerprint.platform, locale: this.fingerprint.locale, mobile: this.fingerprint.mobile, __fpDeviceMemory: this.fingerprint.deviceMemory, __fpHardwareConcurrency: this.fingerprint.hardwareConcurrency, seed: this.fingerprint.seed || this.account.id });
+      const patchWebGL = (Prototype) => {
+        if (!Prototype) return;
+        const originalGetParameter = Prototype.getParameter;
+        Prototype.getParameter = function (parameter) {
+          if (parameter === 37445) return webglVendor;
+          if (parameter === 37446) return webglRenderer;
+          return originalGetParameter.call(this, parameter);
+        };
+      };
+      patchWebGL(window.WebGLRenderingContext?.prototype);
+      patchWebGL(window.WebGL2RenderingContext?.prototype);
+    }, { platform: this.fingerprint.platform, locale: this.fingerprint.locale, mobile: this.fingerprint.mobile, __fpDeviceMemory: this.fingerprint.deviceMemory, __fpHardwareConcurrency: this.fingerprint.hardwareConcurrency, colorDepth: this.fingerprint.colorDepth, pixelDepth: this.fingerprint.pixelDepth, webglVendor: this.fingerprint.webglVendor, webglRenderer: this.fingerprint.webglRenderer, seed: this.fingerprint.seed || this.account.id });
     await this.context.addInitScript((title) => {
       const applyTitle = () => { if (document.title !== title) document.title = title; };
       applyTitle();

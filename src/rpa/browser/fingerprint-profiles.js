@@ -15,7 +15,7 @@ function cloneFingerprint(profile) {
 function getFingerprint(key = 'windows') { return cloneFingerprint(profiles[key] || profiles.windows); }
 
 function isCompleteFingerprint(value) {
-  return Boolean(value && typeof value === 'object' && value.mobile === false && value.ua && value.platform && value.locale && value.timezone && Array.isArray(value.brands) && Number.isInteger(value.width) && Number.isInteger(value.height) && Number.isInteger(value.deviceMemory) && Number.isInteger(value.hardwareConcurrency));
+  return Boolean(value && typeof value === 'object' && value.mobile === false && value.ua && value.platform && value.locale && value.timezone && Array.isArray(value.brands) && Number.isInteger(value.width) && Number.isInteger(value.height) && Number.isInteger(value.deviceMemory) && Number.isInteger(value.hardwareConcurrency) && Number.isInteger(value.colorDepth) && value.webglVendor && value.webglRenderer);
 }
 
 function createRandomFingerprint() {
@@ -25,7 +25,12 @@ function createRandomFingerprint() {
   const base = profiles[keys[Math.floor(Math.random() * keys.length)]];
   const resolutions = base.mobile ? [[360, 800], [375, 812], [390, 844], [412, 915]] : [[1366, 768], [1440, 900], [1536, 864], [1600, 900], [1920, 1080]];
   const [width, height] = resolutions[Math.floor(Math.random() * resolutions.length)];
-  const result = { ...cloneFingerprint(base), width, height, deviceMemory: [4, 8, 16][Math.floor(Math.random() * 3)], hardwareConcurrency: [4, 8, 12, 16][Math.floor(Math.random() * 4)], seed: Math.random().toString(36).slice(2) };
+  const webgl = base.platform === 'Win32'
+    ? { vendor: 'Google Inc. (NVIDIA)', renderer: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0)' }
+    : base.platform === 'MacIntel'
+      ? { vendor: 'Apple Inc.', renderer: 'Apple GPU' }
+      : { vendor: 'Mesa/X.org', renderer: 'ANGLE (Mesa, llvmpipe (LLVM 15.0.7, 256 bits) OpenGL 4.5)' };
+  const result = { ...cloneFingerprint(base), width, height, colorDepth: 24, pixelDepth: 24, deviceMemory: [4, 8, 16][Math.floor(Math.random() * 3)], hardwareConcurrency: [4, 8, 12, 16][Math.floor(Math.random() * 4)], webglVendor: webgl.vendor, webglRenderer: webgl.renderer, seed: Math.random().toString(36).slice(2) };
   return result;
 }
 function ensureFingerprint(account) {
