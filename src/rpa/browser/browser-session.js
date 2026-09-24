@@ -73,7 +73,7 @@ class BrowserSession {
   async configure(url) {
     this.context = this.browser.contexts()[0];
     this.page = this.context.pages()[0] || await this.context.newPage();
-    await this.context.addInitScript(({ platform, locale, mobile, __fpDeviceMemory, __fpHardwareConcurrency }) => {
+    await this.context.addInitScript(({ platform, locale, mobile, __fpDeviceMemory, __fpHardwareConcurrency, seed }) => {
       Object.defineProperty(Navigator.prototype, 'platform', { configurable: true, get: () => platform });
       Object.defineProperty(Navigator.prototype, 'language', { configurable: true, get: () => locale });
       Object.defineProperty(Navigator.prototype, 'languages', { configurable: true, get: () => [locale, 'zh', 'en-US'] });
@@ -81,7 +81,26 @@ class BrowserSession {
       Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { configurable: true, get: () => __fpHardwareConcurrency });
       Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { configurable: true, get: () => mobile ? 5 : 0 });
       Object.defineProperty(Navigator.prototype, 'webdriver', { configurable: true, get: () => undefined });
-    }, { platform: this.fingerprint.platform, locale: this.fingerprint.locale, mobile: this.fingerprint.mobile, __fpDeviceMemory: this.fingerprint.deviceMemory, __fpHardwareConcurrency: this.fingerprint.hardwareConcurrency });
+      const hash = String(seed || 'autopost').split('').reduce((value, char) => ((value * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
+      const noise = hash % 7;
+      const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+      CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+        const image = originalGetImageData.apply(this, args);
+        if (image.data.length >= 4) image.data[noise % image.data.length] = (image.data[noise % image.data.length] + noise + 1) % 255;
+        return image;
+      };
+      const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+      HTMLCanvasElement.prototype.toDataURL = function (...args) {
+        const context = this.getContext('2d');
+        let backup = null;
+        if (context && this.width > 0 && this.height > 0) {
+          try { backup = context.getImageData(0, 0, 1, 1); context.fillStyle = `rgba(${noise},${(noise * 3) % 255},${(noise * 7) % 255},0.01)`; context.fillRect(0, 0, 1, 1); } catch { backup = null; }
+        }
+        const result = originalToDataURL.apply(this, args);
+        if (backup && context) { try { context.putImageData(backup, 0, 0); } catch {} }
+        return result;
+      };
+    }, { platform: this.fingerprint.platform, locale: this.fingerprint.locale, mobile: this.fingerprint.mobile, __fpDeviceMemory: this.fingerprint.deviceMemory, __fpHardwareConcurrency: this.fingerprint.hardwareConcurrency, seed: this.fingerprint.seed || this.account.id });
     await this.context.addInitScript((title) => {
       const applyTitle = () => { if (document.title !== title) document.title = title; };
       applyTitle();
