@@ -299,6 +299,7 @@ function App() {
       horizontalCover: values.horizontalCover || "",
       articleCover: values.articleCover || "",
       body: values.body || "",
+      bodyFormat: values.bodyFormat || "plain",
       tags: values.tags || "",
       topics: values.topics || "",
       mentions: values.mentions || "",
@@ -341,7 +342,7 @@ function App() {
     const date = job.publishAt ? new Date(job.publishAt) : null;
     const localPublishAt = date && Number.isFinite(date.getTime()) ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}` : null;
     setContentOpen(true);
-    window.setTimeout(() => contentForm.setFieldsValue({ ...job, targets: (job.targets || []).map((target) => target.accountId), file: job.type === "article" ? (job.images || []).join("\n") : job.file || "", publishAt: localPublishAt }), 0);
+    window.setTimeout(() => contentForm.setFieldsValue({ ...job, bodyFormat: job.bodyFormat || "plain", targets: (job.targets || []).map((target) => target.accountId), file: job.type === "article" ? (job.images || []).join("\n") : job.file || "", publishAt: localPublishAt }), 0);
   }
   async function chooseRoot() {
     const root = await window.autopost.chooseDirectory();

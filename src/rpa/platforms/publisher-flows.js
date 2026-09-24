@@ -2,6 +2,21 @@ const { RpaError } = require('../errors');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function markdownToPlainText(markdown) {
+  return String(markdown || '')
+    .replace(/```[\s\S]*?\n?```/g, (block) => block.replace(/^```[^\n]*\n?/, '').replace(/```$/, ''))
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/[*_~`]/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const publishUrls = {
   X: 'https://x.com/compose/post',
   小红书: 'https://creator.xiaohongshu.com/publish/publish?target=video',
@@ -258,7 +273,9 @@ async function waitForManualPublish(page, platform, log = () => {}, timeoutMs = 
 async function fillArticle(page, platform, job, log = () => {}) {
   if (!(await fillFirst(page, selectors.title[platform], job.title, { timeout: 15000 }))) throw new RpaError('TITLE_INPUT_NOT_FOUND', `${platform} 未找到标题输入框`);
   log(`标题已填写：${job.title}`);
-  const articleBody = job.body || job.description || '';
+  const rawBody = job.body || job.description || '';
+  const articleBody = job.bodyFormat === 'markdown' && platform !== '掘金' ? markdownToPlainText(rawBody) : rawBody;
+  if (job.bodyFormat === 'markdown') log(platform === '掘金' ? '保留 Markdown 原文发布' : 'Markdown 已转换为可读正文');
   if (!(await fillEditor(page, platform, articleBody))) throw new RpaError('EDITOR_NOT_FOUND', `${platform} 未找到文章编辑器`);
   log('文章正文已填写');
   const images = Array.isArray(job.images) ? job.images : String(job.file || '').split(/\r?\n/).filter(Boolean);

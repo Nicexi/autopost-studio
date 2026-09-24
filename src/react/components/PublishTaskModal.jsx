@@ -31,6 +31,7 @@ export default function PublishTaskModal({ open, form, accounts, editing = false
   const contentType = Form.useWatch("type", form) || "video";
   const selectedTargetIds = Form.useWatch("targets", form) || [];
   const publishAt = Form.useWatch("publishAt", form);
+  const bodyFormat = Form.useWatch("bodyFormat", form) || "plain";
   const selectedAccounts = selectedTargetIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean);
   const selectedPlatforms = [...new Set(selectedAccounts.map((account) => account.platform))];
   const supportsMentions = selectedPlatforms.some((platform) => ["X", "抖音", "快手", "知乎", "掘金"].includes(platform));
@@ -85,9 +86,11 @@ export default function PublishTaskModal({ open, form, accounts, editing = false
               <Input size="large" showCount maxLength={100} placeholder="输入发布标题" />
             </Form.Item>
 
+            {contentType === "article" && <div className="body-toolbar"><span>文章格式</span><Form.Item name="bodyFormat" noStyle initialValue="plain"><Segmented size="small" options={[{ value: "plain", label: "纯文本" }, { value: "markdown", label: "Markdown" }]} /></Form.Item></div>}
             <Form.Item name="body" label={contentType === "video" ? "作品描述" : "文章正文"}>
-              <Input.TextArea rows={contentType === "video" ? 4 : 7} showCount maxLength={contentType === "video" ? 2000 : 20000} placeholder={contentType === "video" ? "输入视频描述" : "输入文章正文"} />
+              <Input.TextArea rows={contentType === "video" ? 4 : 7} showCount maxLength={contentType === "video" ? 2000 : 20000} placeholder={contentType === "video" ? "输入视频描述" : bodyFormat === "markdown" ? "输入 Markdown，例如 # 标题、**重点**、[链接](https://...)" : "输入文章正文"} />
             </Form.Item>
+            {contentType === "article" && bodyFormat === "markdown" && <div className="markdown-hint">Markdown 会原样保留给掘金，其他平台会转换为可读正文。</div>}
 
             <div className="asset-grid">
               <FileField form={form} name="file" label={contentType === "video" ? "视频素材" : "文章配图"} placeholder={contentType === "video" ? "MP4、MOV、MKV 或 WebM" : "可选择多张图片"} multiple={contentType === "article"} filters={contentType === "video" ? VIDEO_FILTER : IMAGE_FILTER} icon={contentType === "video" ? <VideoCameraOutlined /> : <FileImageOutlined />} />
