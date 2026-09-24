@@ -1,8 +1,35 @@
 const { RpaError } = require('../errors');
+const fs = require('fs');
+const path = require('path');
 const { sleep, firstLocator, typeLikeHuman, setFile, clickByText, schedule, runPublishFlow } = require('./shared');
 
 const videoInput = ['input[name="buploader"][type="file"]', 'input[type="file"][accept*=".mp4"]', 'input[type="file"][accept*=".mov"]', 'input[type="file"]'];
 const coverInput = ["div.bcc-upload-wrapper > input[type='file'][accept='image/png, image/jpeg']", "div.bcc-upload-wrapper input[type='file']", "input[type='file'][accept*='image']"];
+
+async function setFileWithDataTransfer(page, selectors, filePath) {
+  const locator = await firstLocator(page, selectors, 5000, false);
+  if (!locator) return false;
+  const stat = fs.statSync(filePath);
+  // The extension creates a File in the page itself. Keep this path for
+  // normal-sized assets; very large files fall back to CDP below to avoid
+  // duplicating excessive data in the DevTools protocol message.
+  if (stat.size > 120 * 1024 * 1024) return false;
+  const data = fs.readFileSync(filePath).toString('base64');
+  const extension = path.extname(filePath).toLowerCase();
+  const mime = extension === '.mp4' ? 'video/mp4' : extension === '.mov' ? 'video/quicktime' : extension === '.png' ? 'image/png' : 'image/jpeg';
+  await locator.evaluate((input, payload) => {
+    const binary = atob(payload.data);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const file = new File([bytes], payload.name, { type: payload.type });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { data, name: path.basename(filePath), type: mime });
+  return true;
+}
 
 async function waitForUpload(page, log) {
   const started = Date.now();
@@ -24,7 +51,9 @@ async function uploadVideo(page, job, log) {
   if (!job.file && !job.video) throw new RpaError('VIDEO_REQUIRED', '哔哩哔哩缺少视频素材');
   log('开始查找哔哩哔哩隐藏视频文件控件');
   // Do not click `.upload-area`: Bilibili opens the native file chooser there.
-  if (!(await setFile(page, videoInput, job.file || job.video))) throw new RpaError('VIDEO_INPUT_NOT_FOUND', '哔哩哔哩未找到视频文件控件');
+  const videoPath = job.file || job.video;
+  const injected = await setFileWithDataTransfer(page, videoInput, videoPath) || await setFile(page, videoInput, videoPath);
+  if (!injected) throw new RpaError('VIDEO_INPUT_NOT_FOUND', '哔哩哔哩未找到视频文件控件');
   log(`哔哩哔哩视频文件已注入：${job.file || job.video}`);
   await waitForUpload(page, log);
 }
@@ -38,7 +67,8 @@ async function uploadCover(page, job, log) {
   await sleep(700);
   const tab = page.locator('div.cover-select-header-tab > *:nth-child(2)').first();
   if (await tab.isVisible({ timeout: 1500 }).catch(() => false)) await tab.click({ force: true }).catch(() => {});
-  if (!(await setFile(page, coverInput, cover))) { log('未找到哔哩哔哩封面文件控件'); return; }
+  const injected = await setFileWithDataTransfer(page, coverInput, cover) || await setFile(page, coverInput, cover);
+  if (!injected) { log('未找到哔哩哔哩封面文件控件'); return; }
   log(`哔哩哔哩封面文件已注入：${cover}`);
   await sleep(2500);
   if (await clickByText(page, ['完成'], 3000)) log('哔哩哔哩封面上传完成');
