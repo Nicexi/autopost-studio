@@ -14,14 +14,14 @@ import { PLATFORM_MODES } from "./platforms";
 const IMAGE_FILTER = [{ name: "图片", extensions: ["jpg", "jpeg", "png", "webp"] }];
 const VIDEO_FILTER = [{ name: "视频", extensions: ["mp4", "mov", "mkv", "webm"] }];
 
-function FileField({ form, name, label, placeholder, multiple = false, filters, icon }) {
+function FileField({ form, name, label, placeholder, multiple = false, filters, icon, required = false }) {
   async function chooseFile() {
     const files = await window.autopost.chooseFiles({ multiple, filters });
     if (files.length) form.setFieldValue(name, files.join("\n"));
   }
 
   return (
-    <Form.Item name={name} label={label} rules={name === "file" ? [{ required: true, message: `请选择${label}` }] : []}>
+    <Form.Item name={name} label={label} rules={(name === "file" || required) ? [{ required: true, message: `请选择${label}` }] : []}>
       <Input className="asset-input" prefix={icon} placeholder={placeholder} readOnly addonAfter={<Button type="text" icon={<UploadOutlined />} onClick={chooseFile}>选择文件</Button>} />
     </Form.Item>
   );
@@ -91,7 +91,7 @@ export default function PublishTaskModal({ open, form, accounts, editing = false
 
             <div className="asset-grid">
               <FileField form={form} name="file" label={contentType === "video" ? "视频素材" : "文章配图"} placeholder={contentType === "video" ? "MP4、MOV、MKV 或 WebM" : "可选择多张图片"} multiple={contentType === "article"} filters={contentType === "video" ? VIDEO_FILTER : IMAGE_FILTER} icon={contentType === "video" ? <VideoCameraOutlined /> : <FileImageOutlined />} />
-              <FileField form={form} name={contentType === "video" ? "cover" : "articleCover"} label={contentType === "video" ? "视频封面（通用）" : "文章封面"} placeholder="JPG、PNG 或 WebP" filters={IMAGE_FILTER} icon={<FileImageOutlined />} />
+              <FileField form={form} name={contentType === "video" ? "cover" : "articleCover"} label={contentType === "video" ? (supportsBilibili ? "视频封面（B站必填）" : "视频封面（通用）") : "文章封面"} placeholder="JPG、PNG 或 WebP" filters={IMAGE_FILTER} icon={<FileImageOutlined />} required={contentType === "video" && supportsBilibili} />
             </div>
             {contentType === "video" && <div className="metadata-grid cover-variants"><FileField form={form} name="verticalCover" label="竖版封面" placeholder="可选，9:16" filters={IMAGE_FILTER} icon={<FileImageOutlined />} /><FileField form={form} name="horizontalCover" label="横版封面" placeholder="可选，16:9" filters={IMAGE_FILTER} icon={<FileImageOutlined />} /></div>}
 
