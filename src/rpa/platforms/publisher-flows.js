@@ -70,7 +70,7 @@ const selectors = {
     快手: ['input[type="file"]'],
     西瓜视频: ['input[type="file"]'],
     微信视频号: ['input[type="file"]', 'input[accept*="video"]'],
-    哔哩哔哩: ['input[type="file"][accept*="video"]', 'input[type="file"]', 'input[accept*="video"]'],
+    哔哩哔哩: ['input[type="file"][accept*="video"]', 'input[accept*="video"]', '[class*="upload"] input[type="file"]', 'input[type="file"]'],
     知乎: ['input[type="file"]'],
   },
   image: {
@@ -80,7 +80,7 @@ const selectors = {
     知乎: ['input.UploadPicture-input', 'input[accept*="image"]'],
     微信公众号: ['input[type="file"]'],
     掘金: ['input[type="file"]'],
-    哔哩哔哩: ['input[type="file"][accept*="image"]', 'input[accept*="image"]', 'input[type="file"]'],
+    哔哩哔哩: ['input[type="file"][accept*="image"]', 'input[accept*="image"]', '[class*="cover"] input[type="file"]', 'input[accept*="png"]', 'input[accept*="jpg"]'],
   },
 };
 
@@ -161,6 +161,17 @@ async function fillEditor(page, platform, text) {
 async function uploadVideo(page, platform, job, log = () => {}) {
   const videoPath = job.file || job.video;
   if (!videoPath) throw new RpaError('VIDEO_REQUIRED', `${platform} 缺少视频素材`);
+  if (platform === '哔哩哔哩') {
+    log('哔哩哔哩发布页已打开，准备展开视频上传控件');
+    const opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传'], { timeout: 5000 });
+    if (opened) {
+      log('已点击哔哩哔哩视频上传入口，等待文件控件挂载');
+      await sleep(800);
+    } else {
+      log('未找到显式上传入口，继续检查隐藏文件控件');
+    }
+  }
+  log(`开始注入${platform}视频素材`);
   const uploaded = await setFile(page, selectors.file[platform], videoPath);
   if (!uploaded) throw new RpaError('VIDEO_INPUT_NOT_FOUND', `${platform} 未找到视频上传控件`);
   log(`视频素材已注入：${videoPath}`);
