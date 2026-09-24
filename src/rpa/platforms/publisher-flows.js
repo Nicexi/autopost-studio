@@ -1,4 +1,5 @@
 const { RpaError } = require('../errors');
+const bilibili = require('./bilibili');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -384,6 +385,7 @@ async function fillVideo(page, platform, job, log = () => {}) {
 }
 
 async function publishOnPlatform({ page, platform, job, log, beforePublish = async () => 'confirm' }) {
+  if (platform === '哔哩哔哩') return bilibili.publish({ page, job, log, beforePublish });
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     if (attempt > 1) {
       log(`开始第 ${attempt} 次重新填充素材`);
