@@ -184,8 +184,38 @@ async function schedule(page, publishAt, log = () => {}) {
 
 async function selectBilibiliDeclaration(page, value, log = () => {}) {
   const declaration = value || '自制';
+  // Bilibili has used a native select, radio labels and a custom popover
+  // for this field across different creator accounts. Prefer form controls
+  // first, then fall back to the visible text flow.
+  const select = page.locator('select').filter({ has: page.locator('option') }).first();
+  try {
+    if (await select.isVisible({ timeout: 1200 })) {
+      const options = await select.locator('option').allTextContents();
+      const option = options.find((text) => text.trim() === declaration) || options.find((text) => text.includes(declaration));
+      if (option) {
+        await select.selectOption({ label: option.trim() });
+        log(`哔哩哔哩创作声明已选择：${declaration}`);
+        return true;
+      }
+    }
+  } catch { /* continue with custom controls */ }
+
   const opened = await clickByText(page, ['创作声明', '声明原创'], { timeout: 3000 });
   if (opened) await sleep(300);
+  for (const selector of [
+    `label:has-text("${declaration}")`,
+    `[role="radio"]:has-text("${declaration}")`,
+    `input[type="radio"][value="${declaration}"]`,
+  ]) {
+    try {
+      const control = page.locator(selector).first();
+      if (await control.isVisible({ timeout: 1200 })) {
+        await control.click();
+        log(`哔哩哔哩创作声明已选择：${declaration}`);
+        return true;
+      }
+    } catch { /* continue with text fallback */ }
+  }
   const selected = await clickByText(page, [declaration, declaration === '自制' ? '原创' : '自制'], { timeout: 3000 });
   if (selected) log(`哔哩哔哩创作声明已选择：${declaration}`);
   else log('未找到哔哩哔哩创作声明控件，保留平台默认值');
