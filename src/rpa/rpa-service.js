@@ -135,6 +135,9 @@ class RpaService extends EventEmitter {
         this.skipPublishConfirmation(account.id);
         this.log('queue', account, `发布流程失败：${error.message}`);
         results.push({ ...target, success: false, error: error.message, code: error.code });
+      } finally {
+        await this.close(account.id).catch((error) => this.log('queue', account, `关闭账号浏览器失败：${error.message}`));
+        account.debugPort = undefined;
       }
     });
     return results;
