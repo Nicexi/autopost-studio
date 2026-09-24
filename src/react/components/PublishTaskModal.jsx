@@ -35,6 +35,7 @@ export default function PublishTaskModal({ open, form, accounts, editing = false
   const selectedPlatforms = [...new Set(selectedAccounts.map((account) => account.platform))];
   const supportsMentions = selectedPlatforms.some((platform) => ["X", "抖音", "快手", "知乎", "掘金"].includes(platform));
   const supportsCollection = selectedPlatforms.some((platform) => ["抖音", "快手", "西瓜视频"].includes(platform));
+  const supportsBilibili = selectedPlatforms.includes("哔哩哔哩");
   const compatibleAccounts = accounts.filter((account) => (PLATFORM_MODES[account.platform] || []).includes(contentType));
 
   function changeType(type) {
@@ -121,6 +122,7 @@ export default function PublishTaskModal({ open, form, accounts, editing = false
 
             {supportsMentions && <Form.Item name="mentions" label="@好友"><Input placeholder="多个好友用逗号分隔" /></Form.Item>}
             {supportsCollection && <Form.Item name="collection" label="添加合集"><Input placeholder="填写平台合集名称" /></Form.Item>}
+            {supportsBilibili && <Form.Item name="creativeDeclaration" label="哔哩哔哩创作声明" initialValue="自制"><Select options={[{ value: "自制", label: "自制" }, { value: "转载", label: "转载" }, { value: "不涉及", label: "不涉及" }]} /></Form.Item>}
 
             <Form.Item name="visibility" label="可见范围">
               <Select options={[{ value: "public", label: "公开" }, { value: "private", label: "私密" }, { value: "friends", label: "仅好友可见" }]} />

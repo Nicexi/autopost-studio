@@ -65,6 +65,7 @@ const selectors = {
     知乎: ['input.UploadPicture-input', 'input[accept*="image"]'],
     微信公众号: ['input[type="file"]'],
     掘金: ['input[type="file"]'],
+    哔哩哔哩: ['input[type="file"][accept*="image"]', 'input[accept*="image"]', 'input[type="file"]'],
   },
 };
 
@@ -160,6 +161,7 @@ async function uploadCover(page, platform, job, log = () => {}) {
     抖音: ['div.content-upload-new', 'text=设置封面'],
     快手: ['text=设置封面', 'text=更换封面'],
     知乎: ['div.VideoUploadForm-imageEditButton', 'text=设置封面'],
+    哔哩哔哩: ['text=上传封面', 'text=更换封面', '[class*="cover"] input[type="file"]'],
   };
   const trigger = await firstLocator(page, coverTriggers[platform], { timeout: 2500 });
   if (trigger) await trigger.click().catch(() => {});
@@ -178,6 +180,16 @@ async function schedule(page, publishAt, log = () => {}) {
   await input.press('Enter').catch(() => {});
   log(`已设置定时发布时间：${value}`);
   return true;
+}
+
+async function selectBilibiliDeclaration(page, value, log = () => {}) {
+  const declaration = value || '自制';
+  const opened = await clickByText(page, ['创作声明', '声明原创'], { timeout: 3000 });
+  if (opened) await sleep(300);
+  const selected = await clickByText(page, [declaration, declaration === '自制' ? '原创' : '自制'], { timeout: 3000 });
+  if (selected) log(`哔哩哔哩创作声明已选择：${declaration}`);
+  else log('未找到哔哩哔哩创作声明控件，保留平台默认值');
+  return selected;
 }
 
 async function waitForManualPublish(page, platform, log = () => {}, timeoutMs = 30 * 60 * 1000) {
@@ -233,6 +245,7 @@ async function fillVideo(page, platform, job, log = () => {}) {
   await fillEditor(page, platform, [job.body || job.description || '', ...(job.topics ? String(job.topics).split(/[,，\s]+/).filter(Boolean).map((tag) => `#${tag}`) : []), ...(job.tags ? String(job.tags).split(/[,，\s]+/).filter(Boolean).map((tag) => `#${tag}`) : [])].filter(Boolean).join(' '));
   log('作品描述、话题和标签已填写');
   await uploadCover(page, platform, job, log);
+  if (platform === '哔哩哔哩') await selectBilibiliDeclaration(page, job.creativeDeclaration, log);
   await schedule(page, job.publishAt, log);
   return true;
 }

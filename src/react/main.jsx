@@ -303,6 +303,7 @@ function App() {
       topics: values.topics || "",
       mentions: values.mentions || "",
       collection: values.collection || "",
+      creativeDeclaration: values.creativeDeclaration || "自制",
       visibility: values.visibility || "public",
       publishAt: values.publishAt ? new Date(values.publishAt).toISOString() : null,
       platformSettings: Object.fromEntries([...new Set(targets.map((target) => target.platform))].map((platform) => [platform, { cover: values.cover || "", verticalCover: values.verticalCover || "", horizontalCover: values.horizontalCover || "", articleCover: values.articleCover || "", topics: values.topics || "", mentions: values.mentions || "", collection: values.collection || "", visibility: values.visibility || "public" }])),
