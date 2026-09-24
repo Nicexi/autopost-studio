@@ -47,7 +47,7 @@ const selectors = {
     微信公众号: ['input[placeholder*="标题"]', 'input[placeholder*="请输入标题"]'],
     微信视频号: ['input[placeholder*="标题"]', 'input[placeholder*="作品标题"]', 'input[type="text"]'],
     西瓜视频: ['input[placeholder*="标题"]', 'input[type="text"]'],
-    哔哩哔哩: ['input[placeholder*="标题"]', 'input[placeholder*="稿件标题"]', 'input[placeholder*="视频标题"]', 'input[type="text"]'],
+    哔哩哔哩: ['input[maxlength="80"][type="text"]', 'input.input-val[type="text"][maxlength="80"]', 'input[placeholder*="标题"]', 'input[placeholder*="稿件标题"]', 'input[placeholder*="视频标题"]'],
     知乎: ['input[placeholder*="标题"]', 'textarea[placeholder*="标题"]'],
     掘金: ['input[placeholder="输入文章标题..."]'],
   },
@@ -61,7 +61,7 @@ const selectors = {
     掘金: ['div.CodeMirror-code[role="presentation"]', 'div[contenteditable="true"]'],
     西瓜视频: ['div[contenteditable="true"]', 'textarea'],
     微信视频号: ['div[contenteditable="true"]', 'textarea[placeholder*="描述"]'],
-    哔哩哔哩: ['div[contenteditable="true"]', 'textarea[placeholder*="简介"]', 'textarea[placeholder*="作品简介"]', 'textarea'],
+    哔哩哔哩: ['div.ql-editor[contenteditable="true"]', 'div[contenteditable="true"]', 'textarea[placeholder*="简介"]', 'textarea[placeholder*="作品简介"]', 'textarea'],
   },
   file: {
   X: ['input[type="file"]'],
@@ -128,6 +128,10 @@ async function setFile(page, candidates, filePath) {
       const result = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
       if (result.nodeId) {
         await cdp.send('DOM.setFileInputFiles', { nodeId: result.nodeId, files });
+        // DOM.setFileInputFiles changes the browser-side FileList but some
+        // Bilibili builds only start their uploader after a DOM change event.
+        await locator.dispatchEvent('input').catch(() => {});
+        await locator.dispatchEvent('change').catch(() => {});
         await cdp.detach().catch(() => {});
         return true;
       }
@@ -141,7 +145,28 @@ async function setFile(page, candidates, filePath) {
   const locator = await firstLocator(page, candidates, { timeout: 5000, visible: false });
   if (!locator) return false;
   await locator.setInputFiles(files);
+  await locator.dispatchEvent('input').catch(() => {});
+  await locator.dispatchEvent('change').catch(() => {});
   return true;
+}
+
+async function waitForBilibiliUploadCompletion(page, log, timeoutMs = 10 * 60 * 1000) {
+  const started = Date.now();
+  let lastNotice = 0;
+  while (Date.now() - started < timeoutMs) {
+    const state = await page.evaluate(() => {
+      const text = document.body?.innerText || '';
+      return {
+        complete: /(上传完成|上传成功|视频上传完成)/.test(text),
+        failed: /(上传失败|上传出错|文件格式不支持)/.test(text),
+      };
+    }).catch(() => ({ complete: false, failed: false }));
+    if (state.failed) throw new RpaError('BILIBILI_UPLOAD_FAILED', '哔哩哔哩页面报告视频上传失败');
+    if (state.complete) { log('哔哩哔哩视频上传完成'); return; }
+    if (Date.now() - lastNotice > 10000) { log('等待哔哩哔哩视频上传完成'); lastNotice = Date.now(); }
+    await sleep(1000);
+  }
+  throw new RpaError('BILIBILI_UPLOAD_TIMEOUT', '哔哩哔哩视频上传超过 10 分钟未完成');
 }
 
 async function clickByText(page, texts, { timeout = 5000 } = {}) {
@@ -186,6 +211,7 @@ async function uploadVideo(page, platform, job, log = () => {}) {
   const uploaded = await setFile(page, selectors.file[platform], videoPath);
   if (!uploaded) throw new RpaError('VIDEO_INPUT_NOT_FOUND', `${platform} 未找到视频上传控件`);
   log(`视频素材已注入：${videoPath}`);
+  if (platform === '哔哩哔哩') await waitForBilibiliUploadCompletion(page, log);
   await sleep(platform === '哔哩哔哩' ? 5000 : 2500);
   log(platform === '哔哩哔哩' ? '等待哔哩哔哩视频转码和投稿表单加载' : '等待视频处理完成');
 }
@@ -193,6 +219,29 @@ async function uploadVideo(page, platform, job, log = () => {}) {
 async function uploadCover(page, platform, job, log = () => {}) {
   const coverPath = job.cover || job.verticalCover || job.horizontalCover;
   if (!coverPath || !selectors.image[platform]) { log('未设置视频封面，跳过封面上传'); return false; }
+  if (platform === '哔哩哔哩') {
+    log('开始上传哔哩哔哩视频封面');
+    const entry = await firstLocator(page, ['div.cover-main-img > div.img', 'div.cover-main'], { timeout: 10000 });
+    if (entry) await entry.click({ force: true }).catch(() => {});
+    await sleep(1000);
+    const uploadTab = page.locator('div.cover-select-header-tab > *:nth-child(2)').first();
+    if (await uploadTab.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await uploadTab.click({ force: true }).catch(() => {});
+      await sleep(800);
+    }
+    const uploaded = await setFile(page, [
+      "div.bcc-upload-wrapper > input[type='file'][accept='image/png, image/jpeg']",
+      "div.bcc-upload-wrapper input[type='file']",
+      "input[type='file'][accept*='image']",
+    ], coverPath);
+    if (!uploaded) { log('未找到哔哩哔哩封面上传控件'); return false; }
+    log(`哔哩哔哩封面已注入：${coverPath}`);
+    await sleep(3000);
+    const done = await clickByText(page, ['完成'], { timeout: 3000 });
+    if (done) log('哔哩哔哩封面上传完成');
+    else log('哔哩哔哩未找到封面完成按钮');
+    return done;
+  }
   const coverTriggers = {
     小红书: ['div.noCover.uploadCover', 'text=设置封面'],
     抖音: ['div.content-upload-new', 'text=设置封面'],
@@ -221,6 +270,21 @@ async function schedule(page, publishAt, log = () => {}) {
 
 async function selectBilibiliDeclaration(page, value, log = () => {}) {
   const declaration = value || '自制';
+  const originalCheckbox = page.locator("div.original-input-wrp input[type='checkbox']").first();
+  if (await originalCheckbox.isVisible({ timeout: 1500 }).catch(() => false)) {
+    const shouldBeOriginal = declaration === '自制';
+    const checked = await originalCheckbox.isChecked().catch(() => false);
+    if (checked !== shouldBeOriginal) await originalCheckbox.click({ force: true }).catch(() => {});
+    log(`哔哩哔哩创作声明已选择：${declaration}`);
+    return true;
+  }
+  const radioNames = declaration === '自制' ? ['自制', '原创'] : [declaration, '转载', '非自制'];
+  const directRadio = page.locator('span.check-radio-v2-name').filter({ hasText: new RegExp(radioNames.join('|')) }).first();
+  if (await directRadio.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await directRadio.click({ force: true }).catch(() => {});
+    log(`哔哩哔哩创作声明已选择：${declaration}`);
+    return true;
+  }
   // Bilibili has used a native select, radio labels and a custom popover
   // for this field across different creator accounts. Prefer form controls
   // first, then fall back to the visible text flow.
