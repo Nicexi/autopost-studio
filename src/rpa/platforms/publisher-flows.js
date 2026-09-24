@@ -165,7 +165,16 @@ async function uploadVideo(page, platform, job, log = () => {}) {
   if (!videoPath) throw new RpaError('VIDEO_REQUIRED', `${platform} 缺少视频素材`);
   if (platform === '哔哩哔哩') {
     log('哔哩哔哩发布页已打开，准备展开视频上传控件');
-    const opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传', '点击上传或将视频拖拽到此区域'], { timeout: 2500 });
+    // The visible text/SVG nodes use `pointer-events: none`; the click
+    // handler belongs to the surrounding `.upload-area` element.
+    const uploadArea = await firstLocator(page, ['.upload-area', 'div.upload-area'], { timeout: 5000 });
+    let opened = false;
+    if (uploadArea) {
+      await uploadArea.click({ force: true }).catch(() => {});
+      opened = true;
+    } else {
+      opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传', '点击上传或将视频拖拽到此区域'], { timeout: 2500 });
+    }
     if (opened) {
       log('已点击哔哩哔哩视频上传入口，等待文件控件挂载');
       await sleep(800);
