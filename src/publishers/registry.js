@@ -7,7 +7,9 @@ const PLATFORM_DEFINITIONS = {
   抖音: { key: 'douyin', modes: ['video', 'article'], automation: 'browser' },
   快手: { key: 'kuaishou', modes: ['video', 'article'], automation: 'browser' },
   微信公众号: { key: 'wechat', modes: ['article'], automation: 'browser' },
+  微信视频号: { key: 'wechat-channels', modes: ['video'], automation: 'browser' },
   西瓜视频: { key: 'xigua', modes: ['video'], automation: 'browser' },
+  哔哩哔哩: { key: 'bilibili', modes: ['video'], automation: 'browser' },
   知乎: { key: 'zhihu', modes: ['video', 'article'], automation: 'browser' },
   掘金: { key: 'juejin', modes: ['article'], automation: 'browser' }
 };

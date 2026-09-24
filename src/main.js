@@ -17,7 +17,9 @@ const defaultState = {
     { id: 'douyin-main', platform: '抖音', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
     { id: 'kuaishou-main', platform: '快手', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
     { id: 'wechat-main', platform: '微信公众号', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
+    { id: 'channels-main', platform: '微信视频号', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
     { id: 'xigua-main', platform: '西瓜视频', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
+    { id: 'bilibili-main', platform: '哔哩哔哩', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
     { id: 'zhihu-main', platform: '知乎', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' },
     { id: 'juejin-main', platform: '掘金', name: '主账号', note: '', proxy: { enabled: false, server: '', username: '', password: '' }, status: '未连接', cacheDir: '' }
   ],

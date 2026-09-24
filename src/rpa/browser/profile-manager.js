@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureFingerprint } = require('./fingerprint-profiles');
 
-const platformDirectories = { X: 'x', 小红书: 'xiaohongshu', 抖音: 'douyin', 快手: 'kuaishou', 微信公众号: 'wechat', 西瓜视频: 'xigua', 知乎: 'zhihu', 掘金: 'juejin' };
+const platformDirectories = { X: 'x', 小红书: 'xiaohongshu', 抖音: 'douyin', 快手: 'kuaishou', 微信公众号: 'wechat', 微信视频号: 'wechat-channels', 西瓜视频: 'xigua', 哔哩哔哩: 'bilibili', 知乎: 'zhihu', 掘金: 'juejin' };
 
 class ProfileManager {
   constructor({ app, state }) { this.app = app; this.state = state; }

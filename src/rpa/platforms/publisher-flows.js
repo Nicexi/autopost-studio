@@ -8,7 +8,9 @@ const publishUrls = {
   抖音: 'https://creator.douyin.com/creator-micro/content/upload',
   快手: 'https://cp.kuaishou.com/article/publish/video',
   微信公众号: 'https://mp.weixin.qq.com/',
+  微信视频号: 'https://channels.weixin.qq.com/platform/post/create',
   西瓜视频: 'https://studio.ixigua.com/',
+  哔哩哔哩: 'https://member.bilibili.com/platform/upload/video/frame',
   知乎: 'https://www.zhihu.com/creator',
   掘金: 'https://juejin.cn/creator',
 };
@@ -28,7 +30,9 @@ const selectors = {
     抖音: ['input[placeholder*="作品标题"]'],
     快手: ['input[placeholder*="标题"]', 'input[type="text"]'],
     微信公众号: ['input[placeholder*="标题"]', 'input[placeholder*="请输入标题"]'],
+    微信视频号: ['input[placeholder*="标题"]', 'input[placeholder*="作品标题"]', 'input[type="text"]'],
     西瓜视频: ['input[placeholder*="标题"]', 'input[type="text"]'],
+    哔哩哔哩: ['input[placeholder*="标题"]', 'input[placeholder*="视频标题"]', 'input[type="text"]'],
     知乎: ['input[placeholder*="标题"]', 'textarea[placeholder*="标题"]'],
     掘金: ['input[placeholder="输入文章标题..."]'],
   },
@@ -41,6 +45,8 @@ const selectors = {
     知乎: ['div[data-contents="true"]', 'div[contenteditable="true"]'],
     掘金: ['div.CodeMirror-code[role="presentation"]', 'div[contenteditable="true"]'],
     西瓜视频: ['div[contenteditable="true"]', 'textarea'],
+    微信视频号: ['div[contenteditable="true"]', 'textarea[placeholder*="描述"]'],
+    哔哩哔哩: ['div[contenteditable="true"]', 'textarea[placeholder*="简介"]'],
   },
   file: {
   X: ['input[type="file"]'],
@@ -48,6 +54,8 @@ const selectors = {
     抖音: ['input[type="file"]'],
     快手: ['input[type="file"]'],
     西瓜视频: ['input[type="file"]'],
+    微信视频号: ['input[type="file"]', 'input[accept*="video"]'],
+    哔哩哔哩: ['input[type="file"]', 'input[accept*="video"]'],
     知乎: ['input[type="file"]'],
   },
   image: {
