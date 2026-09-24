@@ -70,7 +70,9 @@ const selectors = {
     快手: ['input[type="file"]'],
     西瓜视频: ['input[type="file"]'],
     微信视频号: ['input[type="file"]', 'input[accept*="video"]'],
-    哔哩哔哩: ['input[type="file"][accept*="video"]', 'input[accept*="video"]', '[class*="upload"] input[type="file"]', 'input[type="file"]'],
+    // Bilibili uses an extension allow-list (not `video/*`) and names the
+    // real uploader `buploader`; keep the generic fallback last.
+    哔哩哔哩: ['input[name="buploader"][type="file"]', 'input[type="file"][accept*=".mp4"]', 'input[type="file"][accept*=".mov"]', '[class*="upload"] input[type="file"]', 'input[type="file"]'],
     知乎: ['input[type="file"]'],
   },
   image: {
@@ -122,7 +124,7 @@ async function setFile(page, candidates, filePath) {
     const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     for (const selector of candidates || []) {
       const locator = page.locator(selector).first();
-      try { await locator.waitFor({ state: 'attached', timeout: 15000 }); } catch { continue; }
+      try { await locator.waitFor({ state: 'attached', timeout: 5000 }); } catch { continue; }
       const result = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
       if (result.nodeId) {
         await cdp.send('DOM.setFileInputFiles', { nodeId: result.nodeId, files });
@@ -136,7 +138,7 @@ async function setFile(page, candidates, filePath) {
     if (!String(error?.message || '').includes('50Mb')) throw error;
   }
 
-  const locator = await firstLocator(page, candidates, { timeout: 15000, visible: false });
+  const locator = await firstLocator(page, candidates, { timeout: 5000, visible: false });
   if (!locator) return false;
   await locator.setInputFiles(files);
   return true;
@@ -163,7 +165,7 @@ async function uploadVideo(page, platform, job, log = () => {}) {
   if (!videoPath) throw new RpaError('VIDEO_REQUIRED', `${platform} 缺少视频素材`);
   if (platform === '哔哩哔哩') {
     log('哔哩哔哩发布页已打开，准备展开视频上传控件');
-    const opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传'], { timeout: 5000 });
+    const opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传', '点击上传或将视频拖拽到此区域'], { timeout: 2500 });
     if (opened) {
       log('已点击哔哩哔哩视频上传入口，等待文件控件挂载');
       await sleep(800);
