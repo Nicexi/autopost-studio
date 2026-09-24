@@ -1,0 +1,38 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+
+# Local Electron state, profiles and browser caches
+.env
+.env.*
+autopost-state.json
+profiles/
+cache/
+caches/
+user-data/
+browser-data/
+chrome-profiles/
+*/profiles/
+*/cache/
+*.log
+
+# User media and generated artifacts
+uploads/
+media/
+assets/uploads/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.jpg
+*.jpeg
+*.png
+*.webp
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

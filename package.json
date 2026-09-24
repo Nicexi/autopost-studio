@@ -1,0 +1,25 @@
+{
+  "name": "autopost-studio",
+  "version": "0.1.0",
+  "description": "Offline desktop content workspace for multi-platform publishing",
+  "main": "src/main.js",
+  "scripts": {
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^32.1.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@ant-design/charts": "^2.6.7",
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.6.5",
+    "chrome-remote-interface": "^0.34.0",
+    "playwright-core": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}
