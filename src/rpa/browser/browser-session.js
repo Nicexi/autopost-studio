@@ -28,7 +28,7 @@ class BrowserSession {
   viewport() { const width = Number(this.windowSize.width) || this.fingerprint.width; const height = Number(this.windowSize.height) || this.fingerprint.height; return { width: Math.max(800, Math.round(width)), height: Math.max(600, Math.round(height)) }; }
   async start(url) {
     if (this.context && this.browser?.isConnected?.()) {
-      try { await this.page.goto(url, { waitUntil: 'domcontentloaded' }); await this.setWindowTitle(); return this; } catch { await this.close(); }
+      try { await this.page.goto(url, { waitUntil: 'commit', timeout: 15000 }); await this.setWindowTitle(); return this; } catch { await this.close(); }
     }
     if (Number.isInteger(this.account.debugPort) && this.account.debugPort > 0 && !reservedPorts.has(this.account.debugPort)) {
       try {
@@ -131,7 +131,7 @@ class BrowserSession {
     await cdp.send('Emulation.setTimezoneOverride', { timezoneId: this.fingerprint.timezone });
     await this.page.setViewportSize(this.viewport());
     this.page.on('domcontentloaded', () => this.setWindowTitle());
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await this.page.goto(url, { waitUntil: 'commit', timeout: 15000 }).catch(() => {});
     await this.setWindowTitle();
   }
   async setWindowTitle() { if (!this.page || !this.windowTitle) return; await this.page.evaluate((title) => { document.title = title; }, this.windowTitle).catch(() => {}); }
