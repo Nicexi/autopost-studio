@@ -32,7 +32,9 @@ async function setFile(page, selectors, filePath) {
       const result = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
       if (!result.nodeId) continue;
       await cdp.send('DOM.setFileInputFiles', { nodeId: result.nodeId, files });
-      await page.locator(selector).first().dispatchEvent('change');
+      // Chrome dispatches the file input events for DOM.setFileInputFiles.
+      // Dispatching a second change event creates duplicate upload cards on
+      // platforms such as Bilibili.
       return true;
     }
   } finally {

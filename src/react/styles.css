@@ -12,3 +12,20 @@
 .confirmation-list{border:1px solid #e4d7db;border-radius:4px;overflow:hidden}.confirmation-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #f0e7ea}.confirmation-row:last-child{border-bottom:0}.confirmation-row>div:first-child{min-width:0;color:#35131f}.confirmation-row>div:first-child>div{margin-top:4px;color:#806b72;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px}
 .accounts-table{width:100%}.accounts-table .ant-table-container{width:100%}.accounts-table .ant-table-cell{vertical-align:middle}
 .body-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 8px;color:#5d3945;font-size:12px;font-weight:600}.markdown-hint{margin:-8px 0 16px;color:#8f6875;font-size:11px;line-height:1.5}
+/* Keep task actions anchored while a large account selection scrolls. */
+.publish-task-modal .ant-modal-body{overflow-y:auto;overflow-x:hidden}
+.publish-task-modal .ant-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:nowrap;width:100%;box-sizing:border-box;white-space:nowrap}
+.publish-task-modal .ant-modal-footer .ant-btn{flex:0 0 auto}
+.publish-task-modal.ant-modal-wrap{overflow:hidden}
+.publish-task-modal{top:0;padding-bottom:0;max-width:calc(100vw - 32px);height:auto;max-height:calc(100vh - 32px);margin:16px auto}
+.publish-task-modal .ant-modal-content{height:auto;max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.publish-task-modal .ant-modal-header,.publish-task-modal .ant-modal-footer{flex:0 0 auto}
+.publish-task-modal .ant-modal-body{flex:1 1 auto;min-height:0;max-height:none}
+html,body,#root{width:100%;height:100%;overflow:hidden}
+.shell,.shell>.ant-layout,.shell>.ant-layout>.ant-layout{min-width:0;min-height:0;overflow:hidden}
+.accounts-table,.accounts-table .ant-table-wrapper,.accounts-table .ant-spin-nested-loading,.accounts-table .ant-spin-container{width:100%;max-width:100%;min-width:0}
+.accounts-table .ant-table{width:100%!important;table-layout:fixed!important}
+.accounts-table .ant-table-container{max-width:100%;overflow:hidden}
+.accounts-table .ant-table-cell{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.publish-task-modal .ant-modal-wrap{height:100%;overflow:hidden}
+.publish-task-modal .ant-modal-body{min-height:0;overflow-y:auto;overflow-x:hidden}

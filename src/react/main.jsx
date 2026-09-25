@@ -150,12 +150,12 @@ function App() {
       render: (value) =>
         value?.enabled ? <Tag color={BURGUNDY}>已配置</Tag> : "直连",
     },
-    { title: "缓存目录", dataIndex: "cacheDir", width: 320, ellipsis: true },
+    { title: "缓存目录", dataIndex: "cacheDir", width: 180, ellipsis: true },
     {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width:250,
+      width:220,
         render: (_, record) => (
         <Space>
             <Button size="small" icon={<EditOutlined />} onClick={() => openEditAccount(record)}>编辑</Button>
@@ -460,7 +460,6 @@ function App() {
                 locale={{ emptyText: "还没有账号" }}
                 className="accounts-table"
                 tableLayout="fixed"
-                scroll={{ x: 1190 }}
                 pagination={{ pageSize: 10 }}
                   />
                 </div>

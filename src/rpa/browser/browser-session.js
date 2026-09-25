@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const net = require('net');
 const { chromium } = require('playwright-core');
 const { RpaError } = require('../errors');
@@ -8,6 +8,29 @@ const reservedPorts = new Set();
 function findFreePort(start = 9300) {
   if (reservedPorts.has(start)) return findFreePort(start + 1);
   return new Promise((resolve, reject) => { const server = net.createServer(); server.on('error', () => findFreePort(start + 1).then(resolve, reject)); server.listen(start, '127.0.0.1', () => server.close(() => { reservedPorts.add(start); resolve(start); })); });
+}
+
+function findProfileDebugPort(profileDir) {
+  try {
+    const processes = execFileSync('ps', ['-axo', 'command='], { encoding: 'utf8', timeout: 1500 });
+    const line = processes.split('\n').find((command) => command.includes(`--user-data-dir=${profileDir}`) && command.includes('--remote-debugging-port='));
+    const match = line?.match(/--remote-debugging-port=(\d+)/);
+    return match ? Number(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function findProfileChromePids(profileDir) {
+  try {
+    const processes = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8', timeout: 1500 });
+    return processes.split('\n').map((line) => {
+      const match = line.trim().match(/^(\d+)\s+(.+)$/);
+      return match && match[2].includes(`--user-data-dir=${profileDir}`) ? Number(match[1]) : null;
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 async function connectWithRetry(port, processHandle, attempts = 36) {
@@ -49,6 +72,29 @@ class BrowserSession {
       }
     }
 
+    // A previous app instance may still own this profile. Chrome refuses to
+    // start a second process with the same user-data-dir and silently forwards
+    // the URL to the first process, leaving the newly reserved port unopened.
+    const profilePort = findProfileDebugPort(this.profileDir);
+    if (profilePort && !reservedPorts.has(profilePort)) {
+      try {
+        this.port = profilePort;
+        this.progress(`发现缓存目录已被 Chrome 使用，复用调试端口：${profilePort}`);
+        reservedPorts.add(this.port);
+        this.browser = await chromium.connectOverCDP(`http://127.0.0.1:${this.port}`, { timeout: 3000 });
+        this.progress(`已连接缓存目录对应的 Chrome 调试端口：${this.port}`);
+        this.account.debugPort = this.port;
+        await this.configure(url);
+        this.progress(`已复用账号 Chrome：${url}`);
+        return this;
+      } catch {
+        this.browser = null;
+        this.context = null;
+        this.page = null;
+        reservedPorts.delete(this.port);
+      }
+    }
+
     const errors = [];
     for (let launchAttempt = 0; launchAttempt < 3; launchAttempt += 1) {
       this.port = await findFreePort(9300 + launchAttempt * 100);
@@ -77,12 +123,17 @@ class BrowserSession {
     throw new RpaError('BROWSER_LAUNCH_FAILED', `账号 Chrome 启动失败；已尝试调试端口 ${detail || '未知'}，请确认窗口已完全启动后重试`, { attempts: errors });
   }
   async configure(url) {
+    this.progress('开始读取 Chrome 浏览器上下文');
     this.context = this.browser.contexts()[0];
     if (!this.context) throw new RpaError('BROWSER_CONTEXT_MISSING', 'Chrome 未返回可用浏览器上下文');
+    this.progress('Chrome 浏览器上下文已连接');
     const targetHost = new URL(url).hostname;
     const pages = this.context.pages();
-    this.page = pages.find((candidate) => candidate.url().includes(targetHost)) || pages.find((candidate) => /^https?:/i.test(candidate.url())) || await this.context.newPage();
+    const targetPages = pages.filter((candidate) => candidate.url().includes(targetHost));
+    this.page = targetPages[targetPages.length - 1] || pages.filter((candidate) => /^https?:/i.test(candidate.url())).pop() || await this.context.newPage();
     this.progress(`选中发布页面：${this.page.url() || '新页面'}`);
+    if (this.page.isClosed()) throw new RpaError('BROWSER_PAGE_CLOSED', '选中的 Chrome 页面已经关闭');
+    this.progress('开始安装浏览器指纹脚本');
     await this.context.addInitScript(({ platform, locale, mobile, __fpDeviceMemory, __fpHardwareConcurrency, colorDepth, pixelDepth, webglVendor, webglRenderer, seed }) => {
       Object.defineProperty(Navigator.prototype, 'platform', { configurable: true, get: () => platform });
       Object.defineProperty(Navigator.prototype, 'language', { configurable: true, get: () => locale });
@@ -136,10 +187,13 @@ class BrowserSession {
       observeTitle();
       window.setInterval(applyTitle, 3000);
     }, this.windowTitle);
+    this.progress('浏览器指纹脚本安装完成');
     const cdp = await this.context.newCDPSession(this.page);
+    this.progress('CDP 页面会话已创建');
     await cdp.send('Emulation.setUserAgentOverride', { userAgent: this.fingerprint.ua, platform: this.fingerprint.platform, acceptLanguage: this.fingerprint.locale, userAgentMetadata: { brands: this.fingerprint.brands, fullVersion: '154.0.0.0', platform: this.fingerprint.platform, platformVersion: '10.0.0', architecture: 'x86', model: '', mobile: false } });
     await cdp.send('Emulation.setTimezoneOverride', { timezoneId: this.fingerprint.timezone });
     await this.page.setViewportSize(this.viewport());
+    this.progress('浏览器窗口尺寸已设置');
     this.page.on('domcontentloaded', () => this.setWindowTitle());
     this.progress(`开始导航到发布页面：${url}`);
     await this.page.goto(url, { waitUntil: 'commit', timeout: 15000 }).catch((error) => this.progress(`发布页导航等待结束：${error.message}`));
@@ -147,7 +201,25 @@ class BrowserSession {
     this.progress(`发布页面导航完成：${this.page.url()}`);
   }
   async setWindowTitle() { if (!this.page || !this.windowTitle) return; await this.page.evaluate((title) => { document.title = title; }, this.windowTitle, { timeout: 5000 }).catch(() => {}); }
-  async close() { if (this.browser) await this.browser.close().catch(() => {}); if (this.port) reservedPorts.delete(this.port); this.browser = null; this.context = null; this.page = null; this.port = null; }
+  async close() {
+    const profilePids = findProfileChromePids(this.profileDir);
+    if (this.browser) await this.browser.close().catch(() => {});
+    // A CDP-connected Playwright browser may only detach from an externally
+    // launched Chrome. Terminate the account-scoped Chrome process as a
+    // fallback so app shutdown never leaves fingerprint windows behind.
+    const ownProcess = this.process;
+    if (ownProcess && ownProcess.exitCode === null) ownProcess.kill('SIGTERM');
+    for (const pid of profilePids) {
+      if (pid === process.pid) continue;
+      try { process.kill(pid, 'SIGTERM'); } catch {}
+    }
+    if (this.port) reservedPorts.delete(this.port);
+    this.process = null;
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+    this.port = null;
+  }
   async cookies() { return this.context ? this.context.cookies() : []; }
   async evaluate(expression, arg) { return this.page ? this.page.evaluate(expression, arg).catch(() => null) : null; }
 }

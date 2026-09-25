@@ -1,5 +1,7 @@
 const { RpaError } = require('../errors');
 const bilibili = require('./bilibili');
+const douyin = require('./douyin');
+const xiaohongshu = require('./xiaohongshu');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -129,10 +131,8 @@ async function setFile(page, candidates, filePath) {
       const result = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
       if (result.nodeId) {
         await cdp.send('DOM.setFileInputFiles', { nodeId: result.nodeId, files });
-        // DOM.setFileInputFiles changes the browser-side FileList but some
-        // Bilibili builds only start their uploader after a DOM change event.
-        await locator.dispatchEvent('input').catch(() => {});
-        await locator.dispatchEvent('change').catch(() => {});
+        // Chrome emits the file input events for DOM.setFileInputFiles.
+        // Sending another change event can create duplicate upload cards.
         await cdp.detach().catch(() => {});
         return true;
       }
@@ -146,8 +146,6 @@ async function setFile(page, candidates, filePath) {
   const locator = await firstLocator(page, candidates, { timeout: 5000, visible: false });
   if (!locator) return false;
   await locator.setInputFiles(files);
-  await locator.dispatchEvent('input').catch(() => {});
-  await locator.dispatchEvent('change').catch(() => {});
   return true;
 }
 
@@ -189,24 +187,13 @@ async function fillEditor(page, platform, text) {
 async function uploadVideo(page, platform, job, log = () => {}) {
   const videoPath = job.file || job.video;
   if (!videoPath) throw new RpaError('VIDEO_REQUIRED', `${platform} 缺少视频素材`);
+  if (platform === '抖音') return douyin.uploadVideo(page, job, log);
+  if (platform === '小红书') return xiaohongshu.uploadVideo(page, job, log);
   if (platform === '哔哩哔哩') {
     log('哔哩哔哩发布页已打开，准备展开视频上传控件');
     // The visible text/SVG nodes use `pointer-events: none`; the click
     // handler belongs to the surrounding `.upload-area` element.
-    const uploadArea = await firstLocator(page, ['.upload-area', 'div.upload-area'], { timeout: 5000 });
-    let opened = false;
-    if (uploadArea) {
-      await uploadArea.click({ force: true }).catch(() => {});
-      opened = true;
-    } else {
-      opened = await clickByText(page, ['上传视频', '上传视频投稿', '点击上传', '点击上传或将视频拖拽到此区域'], { timeout: 2500 });
-    }
-    if (opened) {
-      log('已点击哔哩哔哩视频上传入口，等待文件控件挂载');
-      await sleep(800);
-    } else {
-      log('未找到显式上传入口，继续检查隐藏文件控件');
-    }
+    log('不点击系统文件选择入口，直接等待哔哩哔哩隐藏视频控件');
   }
   log(`开始注入${platform}视频素材`);
   const uploaded = await setFile(page, selectors.file[platform], videoPath);
@@ -220,16 +207,15 @@ async function uploadVideo(page, platform, job, log = () => {}) {
 async function uploadCover(page, platform, job, log = () => {}) {
   const coverPath = job.cover || job.verticalCover || job.horizontalCover;
   if (!coverPath || !selectors.image[platform]) { log('未设置视频封面，跳过封面上传'); return false; }
+  if (platform === '抖音') return douyin.uploadCover(page, job, log);
+  if (platform === '小红书') return xiaohongshu.uploadCover(page, job, log);
   if (platform === '哔哩哔哩') {
     log('开始上传哔哩哔哩视频封面');
-    const entry = await firstLocator(page, ['div.cover-main-img > div.img', 'div.cover-main'], { timeout: 10000 });
+    const entry = await firstLocator(page, ['text=添加封面', '.cover-empty-pill', 'div.cover-main-img > div.img', 'div.cover-main'], { timeout: 10000 });
     if (entry) await entry.click({ force: true }).catch(() => {});
     await sleep(1000);
-    const uploadTab = page.locator('div.cover-select-header-tab > *:nth-child(2)').first();
-    if (await uploadTab.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await uploadTab.click({ force: true }).catch(() => {});
-      await sleep(800);
-    }
+    // The image input is mounted by the cover editor; do not click a native
+    // upload trigger because it opens the operating-system file picker.
     const uploaded = await setFile(page, [
       "div.bcc-upload-wrapper > input[type='file'][accept='image/png, image/jpeg']",
       "div.bcc-upload-wrapper input[type='file']",
@@ -243,15 +229,8 @@ async function uploadCover(page, platform, job, log = () => {}) {
     else log('哔哩哔哩未找到封面完成按钮');
     return done;
   }
-  const coverTriggers = {
-    小红书: ['div.noCover.uploadCover', 'text=设置封面'],
-    抖音: ['div.content-upload-new', 'text=设置封面'],
-    快手: ['text=设置封面', 'text=更换封面'],
-    知乎: ['div.VideoUploadForm-imageEditButton', 'text=设置封面'],
-    哔哩哔哩: ['text=上传封面', 'text=更换封面', '[class*="cover"] input[type="file"]'],
-  };
-  const trigger = await firstLocator(page, coverTriggers[platform], { timeout: 2500 });
-  if (trigger) await trigger.click().catch(() => {});
+  // Never click a platform upload label here: that opens the OS file picker.
+  // Platform adapters expose/mount hidden inputs before this shared fallback.
   const uploaded = await setFile(page, selectors.image[platform], coverPath);
   if (uploaded) { log(`封面已注入：${coverPath}`); await sleep(1500); } else log('未找到封面上传控件');
   return uploaded;
