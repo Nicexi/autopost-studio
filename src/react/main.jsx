@@ -211,11 +211,12 @@ function App() {
             okButtonProps={{ danger: true }}
             onConfirm={async () => {
               try {
-                await window.autopost.deleteAccount(record.id);
+                const deletion = await window.autopost.deleteAccount(record.id);
                 const next = { ...state, accounts: state.accounts.filter((account) => account.id !== record.id), jobs: state.jobs.map((job) => ({ ...job, targets: (job.targets || []).filter((target) => target.accountId !== record.id) })).filter((job) => job.targets.length), contents: state.contents.map((content) => ({ ...content, targets: (content.targets || []).filter((target) => target.accountId !== record.id) })).filter((content) => content.targets.length) };
                 await save(next);
-                log("accounts", `已删除账号及缓存：${record.platform} / ${record.name}`);
-                msg.success("账号及缓存已删除");
+                log("accounts", deletion.cacheDeleted ? `已删除账号及缓存：${record.platform} / ${record.name}` : `已删除账号，缓存目录因归属无法验证而保留：${deletion.cacheDir}`);
+                if (deletion.cacheDeleted) msg.success("账号及缓存已删除");
+                else msg.warning("账号已删除；缓存归属无法验证，目录已保留以避免误删");
               } catch (error) { msg.error(error.message); log("accounts", `删除账号失败：${error.message}`); }
             }}
           >

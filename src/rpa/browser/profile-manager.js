@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ensureFingerprint } = require('./fingerprint-profiles');
+const { markProfileOwned } = require('./profile-ownership');
 
 const platformDirectories = { X: 'x', 小红书: 'xiaohongshu', 抖音: 'douyin', 快手: 'kuaishou', 微信公众号: 'wechat', 微信视频号: 'wechat-channels', 西瓜视频: 'xigua', 哔哩哔哩: 'bilibili', 知乎: 'zhihu', 掘金: 'juejin' };
 
@@ -10,6 +11,7 @@ class ProfileManager {
     const root = this.state.settings.cacheRoot || path.join(this.app.getPath('userData'), 'profiles');
     const directory = account.cacheDir || path.join(root, platformDirectories[account.platform] || 'other', account.id);
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    if (!account.cacheDir) markProfileOwned(directory, account.id, [root, this.app.getPath('userData')]);
     ensureFingerprint(account);
     return directory;
   }

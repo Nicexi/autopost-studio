@@ -6,6 +6,7 @@ const { ensureProfile } = require('./publishers/session-store');
 const { RpaService } = require('./rpa/rpa-service');
 const { detectChrome } = require('./rpa/browser/chrome-detector');
 const { platformDirectories } = require('./rpa/browser/profile-manager');
+const { markProfileOwned, isProfileOwnedBy } = require('./rpa/browser/profile-ownership');
 const { profiles, ensureFingerprint } = require('./rpa/browser/fingerprint-profiles');
 
 const defaultState = {
@@ -82,6 +83,7 @@ app.whenReady().then(() => {
     const root = state.settings.cacheRoot || path.join(app.getPath('userData'), 'profiles');
     account.cacheDir = path.join(root, platformDirectories[platform] || 'other', slug);
     fs.mkdirSync(account.cacheDir, { recursive: true, mode: 0o700 });
+    markProfileOwned(account.cacheDir, account.id, [root, app.getPath('userData')]);
     state.accounts.push(account); writeState(state); return account;
   });
   ipcMain.handle('account:update', async (_, { accountId, platform, name, note = '', proxy = {} }) => {
@@ -117,20 +119,25 @@ app.whenReady().then(() => {
     await rpaService.close(accountId);
     const root = path.resolve(state.settings.cacheRoot || path.join(app.getPath('userData'), 'profiles'));
     const cacheDir = path.resolve(account.cacheDir || path.join(root, platformDirectories[account.platform] || 'other', account.id));
-    const isOwnedCache = cacheDir && cacheDir !== root && (cacheDir.startsWith(`${root}${path.sep}`) || path.basename(cacheDir) === account.id);
+    const isOwnedCache = isProfileOwnedBy(cacheDir, account.id, [root, app.getPath('userData')]);
     if (isOwnedCache && fs.existsSync(cacheDir)) fs.rmSync(cacheDir, { recursive: true, force: true });
+    const cacheDeleted = Boolean(isOwnedCache);
     state.accounts.splice(index, 1);
     state.jobs = (state.jobs || []).map(job => ({ ...job, targets: (job.targets || []).filter(target => target.accountId !== accountId) })).filter(job => job.targets.length > 0);
     state.contents = (state.contents || []).map(content => ({ ...content, targets: (content.targets || []).filter(target => target.accountId !== accountId) })).filter(content => content.targets.length > 0);
     writeState(state);
-    return { accountId, cacheDir, deleted: true };
+    return { accountId, cacheDir, cacheDeleted, deleted: true };
   });
   ipcMain.handle('account:open-cache', async (_, accountId) => {
     const account = state.accounts.find(item => item.id === accountId);
     if (!account) throw new Error(`找不到账号: ${accountId}`);
     const root = state.settings.cacheRoot || path.join(app.getPath('userData'), 'profiles');
+    const needsDefaultProfile = !account.cacheDir;
     account.cacheDir = account.cacheDir || path.join(root, platformDirectories[account.platform] || 'other', account.id);
     fs.mkdirSync(account.cacheDir, { recursive: true, mode: 0o700 });
+    if (needsDefaultProfile) {
+      markProfileOwned(account.cacheDir, account.id, [root, app.getPath('userData')]);
+    }
     state.activeAccountId = account.id; writeState(state); await shell.openPath(account.cacheDir); return account;
   });
   ipcMain.handle('account:login', async (_, accountId) => {
@@ -171,10 +178,15 @@ app.whenReady().then(() => {
   ipcMain.handle('account:set-cache-dir', (_, { accountId, cacheDir }) => {
     const account = state.accounts.find(item => item.id === accountId);
     if (!account) throw new Error(`找不到账号: ${accountId}`);
-    if (cacheDir && state.accounts.some(item => item.id !== accountId && item.cacheDir === cacheDir)) {
+    const normalizedCacheDir = cacheDir ? path.resolve(cacheDir) : '';
+    if (normalizedCacheDir && state.accounts.some(item => item.id !== accountId && item.cacheDir && path.resolve(item.cacheDir) === normalizedCacheDir)) {
       throw new Error('这个缓存目录已经被其它平台或账号使用，请选择独立目录');
     }
-    account.cacheDir = cacheDir || '';
+    if (normalizedCacheDir) {
+      fs.mkdirSync(normalizedCacheDir, { recursive: true, mode: 0o700 });
+      markProfileOwned(normalizedCacheDir, account.id, [state.settings.cacheRoot || path.join(app.getPath('userData'), 'profiles'), app.getPath('userData')]);
+    }
+    account.cacheDir = normalizedCacheDir;
     writeState(state);
     return account;
   });

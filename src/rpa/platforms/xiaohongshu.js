@@ -20,19 +20,25 @@ async function uploadCover(page, job, log = () => {}) {
   // XHS requires opening its cover editor before the dialog's image input is
   // created. This clicks a webpage button only; the native file input is
   // never clicked.
-  const trigger = await firstLocator(page, ['text=编辑封面', 'button:has-text("编辑封面")'], 8000);
+  const trigger = await firstLocator(page, [
+    'text=编辑封面',
+    'button:has-text("编辑封面")',
+    '[class*="cover"] [role="button"]',
+    '[class*="cover"] button'
+  ], 10000);
   if (trigger) {
     await trigger.click({ force: true }).catch(() => {});
     await sleep(700);
   }
-  let imageInput = await firstLocator(page, imageInputs, 1500, false);
+  const upload = await firstLocator(page, ['text=上传封面', 'button:has-text("上传封面")'], 5000);
+  if (upload) {
+    await upload.click({ force: true }).catch(() => {});
+    await sleep(500);
+  }
+  const imageInput = await firstLocator(page, imageInputs, 10000, false);
   if (!imageInput) {
-    const upload = await firstLocator(page, ['text=上传封面', 'button:has-text("上传封面")', '[class*="upload"]'], 5000);
-    if (upload) {
-      await upload.click({ force: true }).catch(() => {});
-      await sleep(500);
-    }
-    imageInput = await firstLocator(page, imageInputs, 10000, false);
+    log('小红书封面弹窗未挂载图片控件');
+    return false;
   }
   const uploaded = await setFile(page, imageInputs, cover);
   if (uploaded) {
@@ -41,7 +47,7 @@ async function uploadCover(page, job, log = () => {}) {
     const done = await firstLocator(page, ['text=确定', 'button:has-text("确定")'], 5000);
     if (done) {
       await done.click({ force: true }).catch(() => {});
-      log('小红书封面编辑已点击完成');
+      log('小红书封面编辑已点击确定');
     }
   }
   return uploaded;

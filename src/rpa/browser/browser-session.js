@@ -5,6 +5,11 @@ const { RpaError } = require('../errors');
 const { ensureFingerprint } = require('./fingerprint-profiles');
 const reservedPorts = new Set();
 
+function commandUsesProfile(command, profileDir) {
+  const escaped = String(profileDir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)--user-data-dir=["']?${escaped}(?=$|[\\s"'])`).test(command);
+}
+
 function findFreePort(start = 9300) {
   if (reservedPorts.has(start)) return findFreePort(start + 1);
   return new Promise((resolve, reject) => { const server = net.createServer(); server.on('error', () => findFreePort(start + 1).then(resolve, reject)); server.listen(start, '127.0.0.1', () => server.close(() => { reservedPorts.add(start); resolve(start); })); });
@@ -13,7 +18,7 @@ function findFreePort(start = 9300) {
 function findProfileDebugPort(profileDir) {
   try {
     const processes = execFileSync('ps', ['-axo', 'command='], { encoding: 'utf8', timeout: 1500 });
-    const line = processes.split('\n').find((command) => command.includes(`--user-data-dir=${profileDir}`) && command.includes('--remote-debugging-port='));
+    const line = processes.split('\n').find((command) => commandUsesProfile(command, profileDir) && command.includes('--remote-debugging-port='));
     const match = line?.match(/--remote-debugging-port=(\d+)/);
     return match ? Number(match[1]) : null;
   } catch {
@@ -26,7 +31,8 @@ function findProfileChromePids(profileDir) {
     const processes = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8', timeout: 1500 });
     return processes.split('\n').map((line) => {
       const match = line.trim().match(/^(\d+)\s+(.+)$/);
-      return match && match[2].includes(`--user-data-dir=${profileDir}`) ? Number(match[1]) : null;
+      if (!match) return null;
+      return commandUsesProfile(match[2], profileDir) ? Number(match[1]) : null;
     }).filter(Boolean);
   } catch {
     return [];
@@ -224,4 +230,4 @@ class BrowserSession {
   async evaluate(expression, arg) { return this.page ? this.page.evaluate(expression, arg).catch(() => null) : null; }
 }
 
-module.exports = { BrowserSession };
+module.exports = { BrowserSession, commandUsesProfile };
