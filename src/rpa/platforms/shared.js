@@ -1,11 +1,16 @@
 const { RpaError } = require('../errors');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function firstLocator(page, selectors, timeout = 5000, visible = true) {
+  const deadline = Date.now() + timeout;
   for (const selector of selectors || []) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     const locator = page.locator(selector).first();
-    try { await locator.waitFor({ state: visible ? 'visible' : 'attached', timeout }); return locator; } catch {}
+    try { await locator.waitFor({ state: visible ? 'visible' : 'attached', timeout: Math.min(remaining, 1000) }); return locator; } catch {}
   }
   return null;
 }
@@ -16,18 +21,38 @@ async function typeLikeHuman(locator, value) {
   await locator.pressSequentially(String(value), { delay: 8 + Math.floor(Math.random() * 13) });
 }
 
-async function setFile(page, selectors, filePath) {
+async function setFile(page, selectors, filePath, { dispatchEvents = false, forcePayload = false, mimeType = 'application/octet-stream' } = {}) {
   if (!filePath) return false;
   const files = Array.isArray(filePath) ? filePath : [filePath];
   const locator = await firstLocator(page, selectors, 5000, false);
   if (!locator) return false;
+
+  // Image upload widgets validate File.type. A CDP path injection can produce
+  // an empty MIME type on some Chrome/Semi builds, so use an explicit payload
+  // for small cover images while retaining CDP for large videos.
+  if (forcePayload) {
+    const payloads = files.map((file) => {
+      const extension = path.extname(file).toLowerCase();
+      const detectedMime = extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : extension === '.gif' ? 'image/gif' : 'image/jpeg';
+      return { name: path.basename(file), mimeType: mimeType === 'image/*' ? detectedMime : mimeType, buffer: fs.readFileSync(file) };
+    });
+    await locator.setInputFiles(payloads);
+    if (dispatchEvents) {
+      await locator.dispatchEvent('input').catch(() => {});
+      await locator.dispatchEvent('change').catch(() => {});
+    }
+    return true;
+  }
 
   // CDP passes local paths to the local Chrome process. Playwright's remote
   // file transfer rejects videos above 50 MB, so it is only a fallback.
   const cdp = await page.context().newCDPSession(page);
   try {
     await cdp.send('DOM.enable');
-    const { root } = await cdp.send('DOM.getDocument', { depth: 1 });
+    // Cover inputs are usually mounted inside a nested modal subtree. A
+    // shallow document snapshot misses them and causes an unsafe Playwright
+    // remote-file fallback, so query the complete pierced DOM through CDP.
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     for (const selector of selectors) {
       const result = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
       if (!result.nodeId) continue;
@@ -35,19 +60,33 @@ async function setFile(page, selectors, filePath) {
       // Chrome dispatches the file input events for DOM.setFileInputFiles.
       // Dispatching a second change event creates duplicate upload cards on
       // platforms such as Bilibili.
+      if (dispatchEvents) {
+        const target = page.locator(selector).first();
+        await target.dispatchEvent('input').catch(() => {});
+        await target.dispatchEvent('change').catch(() => {});
+      }
       return true;
     }
   } finally {
     await cdp.detach().catch(() => {});
   }
   await locator.setInputFiles(files);
+  if (dispatchEvents) {
+    await locator.dispatchEvent('input').catch(() => {});
+    await locator.dispatchEvent('change').catch(() => {});
+  }
   return true;
 }
 
 async function clickByText(page, texts, timeout = 3000) {
   for (const text of texts) {
     const locator = page.getByText(text, { exact: true }).last();
-    try { await locator.waitFor({ state: 'visible', timeout }); await locator.click(); return true; } catch {}
+    try {
+      await locator.waitFor({ state: 'visible', timeout });
+      await locator.scrollIntoViewIfNeeded().catch(() => {});
+      await locator.click({ force: true });
+      return true;
+    } catch {}
   }
   return false;
 }

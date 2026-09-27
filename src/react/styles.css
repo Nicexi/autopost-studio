@@ -29,3 +29,12 @@ html,body,#root{width:100%;height:100%;overflow:hidden}
 .accounts-table .ant-table-cell{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .publish-task-modal .ant-modal-wrap{height:100%;overflow:hidden}
 .publish-task-modal .ant-modal-body{min-height:0;overflow-y:auto;overflow-x:hidden}
+
+/* Keep the account table inside the workspace while preserving the fixed action column. */
+.accounts-table .ant-table-container{overflow-x:auto!important;overflow-y:hidden!important}
+.accounts-table .ant-table-content{overflow-x:visible!important}
+.accounts-table .ant-table-cell{white-space:nowrap}
+.accounts-table .ant-table-cell-fix-right,
+.accounts-table .ant-table-cell-fix-right-first{overflow:visible!important;background:#fff}
+.accounts-table .account-actions{display:inline-flex;flex-wrap:nowrap;white-space:nowrap}
+.accounts-table .account-actions .ant-btn{flex:0 0 auto}

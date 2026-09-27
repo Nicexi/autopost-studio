@@ -55,7 +55,17 @@ async function connectWithRetry(port, processHandle, attempts = 36) {
 class BrowserSession {
   constructor({ account, executable, profileDir, windowSize = {}, windowTitle = '', onProgress = () => {} }) { this.account = account; this.executable = executable; this.profileDir = profileDir; this.windowSize = windowSize; this.windowTitle = windowTitle || account.name || account.id; this.onProgress = onProgress; this.fingerprint = ensureFingerprint(account); this.browser = null; this.context = null; this.page = null; this.process = null; this.port = null; }
   progress(message) { try { this.onProgress(message); } catch {} }
-  viewport() { const width = Number(this.windowSize.width) || this.fingerprint.width; const height = Number(this.windowSize.height) || this.fingerprint.height; return { width: Math.max(800, Math.round(width)), height: Math.max(600, Math.round(height)) }; }
+  // Creator centers progressively hide the publish toolbar below tablet-sized
+  // breakpoints. Keep the user's configured size when it is large enough, but
+  // guarantee a desktop publishing viewport for reliable RPA.
+  viewport() {
+    const requestedWidth = Number(this.windowSize.width) || this.fingerprint.width;
+    const requestedHeight = Number(this.windowSize.height) || this.fingerprint.height;
+    return {
+      width: Math.max(1200, Math.round(requestedWidth)),
+      height: Math.max(760, Math.round(requestedHeight)),
+    };
+  }
   async start(url) {
     this.progress(`Chrome 会话启动：${url}`);
     if (this.context && this.browser?.isConnected?.()) {
@@ -198,8 +208,9 @@ class BrowserSession {
     this.progress('CDP 页面会话已创建');
     await cdp.send('Emulation.setUserAgentOverride', { userAgent: this.fingerprint.ua, platform: this.fingerprint.platform, acceptLanguage: this.fingerprint.locale, userAgentMetadata: { brands: this.fingerprint.brands, fullVersion: '154.0.0.0', platform: this.fingerprint.platform, platformVersion: '10.0.0', architecture: 'x86', model: '', mobile: false } });
     await cdp.send('Emulation.setTimezoneOverride', { timezoneId: this.fingerprint.timezone });
-    await this.page.setViewportSize(this.viewport());
-    this.progress('浏览器窗口尺寸已设置');
+    const viewport = this.viewport();
+    await this.page.setViewportSize(viewport);
+    this.progress(`浏览器窗口尺寸已设置：${viewport.width}×${viewport.height}`);
     this.page.on('domcontentloaded', () => this.setWindowTitle());
     this.progress(`开始导航到发布页面：${url}`);
     await this.page.goto(url, { waitUntil: 'commit', timeout: 15000 }).catch((error) => this.progress(`发布页导航等待结束：${error.message}`));

@@ -95,7 +95,7 @@ async function uploadVideo(page, job, log) {
   const fileCount = await page.locator(videoInput[0]).first().evaluate((input) => input.files?.length || 0).catch(() => 0);
   log(`哔哩哔哩视频文件控件已触发 change（文件数：${fileCount}）`);
   log(`哔哩哔哩视频文件已注入：${job.file || job.video}`);
-  await waitForUpload(page, log);
+  log('哔哩哔哩视频上传已启动，继续填写标题和正文');
 }
 
 async function uploadCover(page, job, log) {
@@ -165,6 +165,9 @@ async function fill(page, job, log) {
   log(`哔哩哔哩标题已填写：${job.title || ''}`);
   const editor = await firstLocator(page, ['div.ql-editor[contenteditable="true"]', 'div[contenteditable="true"]'], 15000);
   if (editor && (job.body || job.description)) await typeLikeHuman(editor, job.body || job.description);
+  // Let title/body entry overlap with transcoding, but wait before opening
+  // the cover editor because Bilibili mounts that form only after processing.
+  await waitForUpload(page, log);
   await selectDeclaration(page, job.creativeDeclaration, log);
   await uploadCover(page, job, log);
   await schedule(page, job.publishAt, log);

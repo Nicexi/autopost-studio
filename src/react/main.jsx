@@ -155,9 +155,9 @@ function App() {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width:220,
+      width: 320,
         render: (_, record) => (
-        <Space>
+        <Space className="account-actions" size={4} wrap={false}>
             <Button size="small" icon={<EditOutlined />} onClick={() => openEditAccount(record)}>编辑</Button>
             <Button
             size="small"
@@ -461,6 +461,7 @@ function App() {
                 locale={{ emptyText: "还没有账号" }}
                 className="accounts-table"
                 tableLayout="fixed"
+                scroll={{ x: "max-content" }}
                 pagination={{ pageSize: 10 }}
                   />
                 </div>

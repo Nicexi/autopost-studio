@@ -90,10 +90,13 @@ const selectors = {
 };
 
 async function firstLocator(page, candidates, { timeout = 10000, visible = true } = {}) {
+  const deadline = Date.now() + timeout;
   for (const selector of candidates || []) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     const locator = page.locator(selector).first();
     try {
-      await locator.waitFor({ state: visible ? 'visible' : 'attached', timeout });
+      await locator.waitFor({ state: visible ? 'visible' : 'attached', timeout: Math.min(remaining, 1000) });
       return locator;
     } catch { /* try the next selector */ }
   }
@@ -199,9 +202,11 @@ async function uploadVideo(page, platform, job, log = () => {}) {
   const uploaded = await setFile(page, selectors.file[platform], videoPath);
   if (!uploaded) throw new RpaError('VIDEO_INPUT_NOT_FOUND', `${platform} 未找到视频上传控件`);
   log(`视频素材已注入：${videoPath}`);
-  if (platform === '哔哩哔哩') await waitForBilibiliUploadCompletion(page, log);
-  await sleep(platform === '哔哩哔哩' ? 5000 : 2500);
-  log(platform === '哔哩哔哩' ? '等待哔哩哔哩视频转码和投稿表单加载' : '等待视频处理完成');
+  // File injection is enough to start the upload. Do not block title/body
+  // entry on a potentially long transcode; the platform UI can process both
+  // operations concurrently. Readiness is checked by the publish controls.
+  await sleep(350);
+  log('视频上传已启动，继续填写标题和正文');
 }
 
 async function uploadCover(page, platform, job, log = () => {}) {
